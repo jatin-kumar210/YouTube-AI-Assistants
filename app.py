@@ -16,7 +16,17 @@ from youtube_transcript_api import (
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from langchain_mistralai import MistralAIEmbeddings, ChatMistralAI
+
+# ============================================================
+# CHANGED: MISTRAL → HUGGING FACE
+# ============================================================
+
+from langchain_huggingface import (
+    HuggingFaceEmbeddings,
+    HuggingFaceEndpoint,
+    ChatHuggingFace,
+)
+
 from langchain_core.prompts import PromptTemplate
 
 
@@ -38,15 +48,17 @@ load_dotenv()
 # API KEY
 # ============================================================
 
+# CHANGED: MISTRAL_API_KEY → HF_TOKEN
+
 def get_api_key():
 
-    key = os.getenv("MISTRAL_API_KEY")
+    key = os.getenv("HF_TOKEN")
 
     if key:
         return key
 
     try:
-        key = st.secrets.get("MISTRAL_API_KEY")
+        key = st.secrets.get("HF_TOKEN")
 
         if key:
             return key
@@ -57,10 +69,10 @@ def get_api_key():
     return None
 
 
-MISTRAL_API_KEY = get_api_key()
+HF_TOKEN = get_api_key()
 
-if MISTRAL_API_KEY:
-    os.environ["MISTRAL_API_KEY"] = MISTRAL_API_KEY
+if HF_TOKEN:
+    os.environ["HF_TOKEN"] = HF_TOKEN
 
 
 # ============================================================
@@ -771,9 +783,13 @@ def create_vector_store(transcript):
         [transcript]
     )
 
-    embeddings = MistralAIEmbeddings(
-        model="mistral-embed",
-        api_key=MISTRAL_API_KEY,
+    # ========================================================
+    # CHANGED:
+    # MistralAIEmbeddings → HuggingFaceEmbeddings
+    # ========================================================
+
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2"
     )
 
     vector_store = FAISS.from_documents(
@@ -796,6 +812,30 @@ def get_retriever(vector_store):
             "k": 5
         },
     )
+
+
+# ============================================================
+# HUGGING FACE LLM
+# ============================================================
+
+def get_llm():
+
+    # ========================================================
+    # DeepSeek-V4.1-Flash through Hugging Face
+    # ========================================================
+
+    llm_endpoint = HuggingFaceEndpoint(
+        repo_id="deepseek-ai/DeepSeek-V4.1-Flash",
+        huggingfacehub_api_token=HF_TOKEN,
+        temperature=0.2,
+        max_new_tokens=1024,
+    )
+
+    llm = ChatHuggingFace(
+        llm=llm_endpoint
+    )
+
+    return llm
 
 
 # ============================================================
@@ -827,6 +867,7 @@ Instructions:
 - Answer clearly and concisely.
 - Use only the provided context.
 - Do not make up information.
+- Do not use outside knowledge.
 - If the answer is not available in the context, say:
   "I don't know based on the provided context."
 
@@ -844,10 +885,12 @@ Answer:
         question=question,
     )
 
-    llm = ChatMistralAI(
-        model="mistral-small-latest",
-        api_key=MISTRAL_API_KEY,
-    )
+    # ========================================================
+    # CHANGED:
+    # ChatMistralAI → Hugging Face DeepSeek
+    # ========================================================
+
+    llm = get_llm()
 
     response = llm.invoke(
         final_prompt
@@ -947,7 +990,7 @@ def render_sidebar():
             </div>
 
             <div class="pipeline-item">
-                3. Mistral Embeddings
+                3. Hugging Face Embeddings
             </div>
 
             <div class="pipeline-item">
@@ -959,7 +1002,7 @@ def render_sidebar():
             </div>
 
             <div class="pipeline-item">
-                6. Mistral LLM
+                6. DeepSeek-V4.1-Flash
             </div>
 
             <div class="pipeline-item">
@@ -983,7 +1026,7 @@ def render_sidebar():
                     </span>
 
                     <span class="tech-value">
-                        mistral-small-latest
+                        DeepSeek-V4.1-Flash
                     </span>
 
                 </div>
@@ -995,7 +1038,7 @@ def render_sidebar():
                     </span>
 
                     <span class="tech-value">
-                        mistral-embed
+                        all-MiniLM-L6-v2
                     </span>
 
                 </div>
@@ -1151,14 +1194,19 @@ def render_video_section():
 
         return
 
-    if not MISTRAL_API_KEY:
+    # ========================================================
+    # CHANGED:
+    # MISTRAL_API_KEY → HF_TOKEN
+    # ========================================================
+
+    if not HF_TOKEN:
 
         st.error(
-            "MISTRAL_API_KEY was not found."
+            "HF_TOKEN was not found."
         )
 
         st.info(
-            "For Streamlit Cloud, add MISTRAL_API_KEY "
+            "For Streamlit Cloud, add HF_TOKEN "
             "under App Settings → Secrets."
         )
 
@@ -1217,14 +1265,18 @@ def render_video_section():
         # ----------------------------------------------------
 
         status.info(
-            "🧠 Creating Mistral embeddings..."
+            "🧠 Creating Hugging Face embeddings..."
         )
 
         progress.progress(60)
 
-        embeddings = MistralAIEmbeddings(
-            model="mistral-embed",
-            api_key=MISTRAL_API_KEY,
+        # ====================================================
+        # CHANGED:
+        # MistralAIEmbeddings → HuggingFaceEmbeddings
+        # ====================================================
+
+        embeddings = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2"
         )
 
         # ----------------------------------------------------
@@ -1497,14 +1549,6 @@ def render_question_section():
 
     # --------------------------------------------------------
     # Native Streamlit Chat Input
-    #
-    # This automatically:
-    #
-    # 1. Stays at bottom
-    # 2. Is sticky
-    # 3. Clears after submit
-    # 4. Works without manual scrolling
-    #
     # --------------------------------------------------------
 
     question = st.chat_input(
@@ -1521,10 +1565,15 @@ def render_question_section():
 
         return
 
-    if not MISTRAL_API_KEY:
+    # ========================================================
+    # CHANGED:
+    # MISTRAL_API_KEY → HF_TOKEN
+    # ========================================================
+
+    if not HF_TOKEN:
 
         st.error(
-            "MISTRAL_API_KEY was not found."
+            "HF_TOKEN was not found."
         )
 
         return
@@ -1571,8 +1620,6 @@ def render_question_section():
 
         # ----------------------------------------------------
         # RERUN
-        #
-        # st.chat_input itself clears automatically.
         # ----------------------------------------------------
 
         st.rerun()
@@ -1597,7 +1644,7 @@ def render_footer():
         <div class="custom-footer">
 
             Built with <span>♥</span>
-            using Streamlit + LangChain + Mistral AI + FAISS
+            using Streamlit + LangChain + Hugging Face + FAISS
 
         </div>
         """
@@ -1652,9 +1699,6 @@ def main():
 
     # --------------------------------------------------------
     # EXTRA BOTTOM SPACE
-    #
-    # Keeps final answer from being hidden behind
-    # the native chat input.
     # --------------------------------------------------------
 
     if st.session_state.vector_store is not None:
@@ -1668,8 +1712,6 @@ def main():
 
     # --------------------------------------------------------
     # CHAT INPUT
-    #
-    # Native Streamlit input automatically stays at bottom.
     # --------------------------------------------------------
 
     render_question_section()

@@ -5,5 +5,7 @@ langchain
 langchain-core
 langchain-community
 langchain-text-splitters
-langchain-mistralai
+langchain-huggingface
+huggingface-hub
+sentence-transformers
 faiss-cpu
