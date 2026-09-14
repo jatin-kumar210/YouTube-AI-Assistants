@@ -3,7 +3,7 @@
 # 🎥 YouTube AI Assistant
 
 ### 🤖 Ask Questions. Understand Videos. Get Intelligent Answers.
-live:-https://readmemd-pnt3rj954vhyu8efywognn.streamlit.app/
+live:-https://youtube-ai-assistants-9juhgb5wa8jph7acljzscc.streamlit.app/
 
 An AI-powered YouTube Transcript Q&A application built using  
 **RAG, LangChain, Mistral AI, FAISS, and Streamlit.**
